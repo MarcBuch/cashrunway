@@ -1,5 +1,6 @@
 import Link from "next/link";
 import CompanyList from "@/components/CompanyList";
+import RiskExplanation from "@/components/RiskExplanation";
 
 export default function Home() {
   return (
@@ -24,6 +25,9 @@ export default function Home() {
             </Link>
           </div>
         </header>
+
+        {/* Risk Explanation */}
+        <RiskExplanation />
 
         {/* Company List */}
         <CompanyList />

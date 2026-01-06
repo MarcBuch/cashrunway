@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Company } from "@/types";
 import Hourglass from "./Hourglass";
 
@@ -14,6 +15,7 @@ export default function CompanyCard({
   onEdit,
   onDelete,
 }: CompanyCardProps) {
+  const [showCalculation, setShowCalculation] = useState(false);
   const statusColors = {
     safe: "bg-green-100 text-green-800 border-green-300",
     warning: "bg-amber-100 text-amber-800 border-amber-300",
@@ -124,6 +126,90 @@ export default function CompanyCard({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Calculation Breakdown */}
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <button
+          onClick={() => setShowCalculation(!showCalculation)}
+          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <svg
+            className={`w-4 h-4 transition-transform ${
+              showCalculation ? "rotate-180" : ""
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+          {showCalculation ? "Hide" : "Show"} Risk Calculation
+        </button>
+
+        {showCalculation && (
+          <div className="mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                  Formula
+                </div>
+                <div className="text-sm font-mono text-gray-700 bg-white px-3 py-2 rounded border border-gray-300">
+                  Runway = (Cash on Hand ÷ Quarterly Burn) × 3
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                  Calculation
+                </div>
+                <div className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-300">
+                  {company.quarterly_burn > 0 ? (
+                    <>
+                      ({formatCurrency(company.cash_on_hand)} ÷{" "}
+                      {formatCurrency(company.quarterly_burn)}) × 3 ={" "}
+                      <strong className="text-blue-700">
+                        {company.runway_months === null ||
+                        company.runway_months === undefined ||
+                        !isFinite(company.runway_months)
+                          ? "∞"
+                          : `${company.runway_months.toFixed(1)} months`}
+                      </strong>
+                    </>
+                  ) : (
+                    <span className="text-gray-500">
+                      No burn rate - infinite runway
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                  Risk Status
+                </div>
+                <div className="text-sm text-gray-700">
+                  <span
+                    className={`inline-block px-2 py-1 rounded text-xs font-semibold ${statusColors[company.status]}`}
+                  >
+                    {company.status.toUpperCase()}
+                  </span>
+                  <span className="ml-2 text-gray-600">
+                    {company.status === "danger" &&
+                      "Less than 3 months remaining - high dilution risk"}
+                    {company.status === "warning" &&
+                      "3-6 months remaining - monitor closely"}
+                    {company.status === "safe" &&
+                      "More than 6 months remaining - lower immediate risk"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
