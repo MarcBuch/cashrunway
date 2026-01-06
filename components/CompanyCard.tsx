@@ -22,6 +22,16 @@ export default function CompanyCard({
     danger: "bg-red-100 text-red-800 border-red-300",
   };
 
+  const ddsColors: Record<
+    NonNullable<Company["risk_category"]>,
+    string
+  > = {
+    Safe: "bg-green-100 text-green-800 border-green-300",
+    Moderate: "bg-amber-100 text-amber-800 border-amber-300",
+    High: "bg-orange-100 text-orange-900 border-orange-300",
+    Critical: "bg-red-100 text-red-800 border-red-300",
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -39,6 +49,11 @@ export default function CompanyCard({
     });
   };
 
+  const hasDds =
+    company.dilution_danger_score !== undefined &&
+    company.risk_category !== undefined &&
+    company.implied_new_shares_pct !== undefined;
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 border-2 border-gray-200 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between mb-4">
@@ -55,6 +70,22 @@ export default function CompanyCard({
             className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${statusColors[company.status]}`}
           >
             {company.status.toUpperCase()}
+          </div>
+
+          <div className="mt-2">
+            {hasDds ? (
+              <span
+                className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${
+                  ddsColors[company.risk_category!]
+                }`}
+              >
+                DDS {company.dilution_danger_score} • {company.risk_category}
+              </span>
+            ) : (
+              <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold border bg-gray-100 text-gray-700 border-gray-300">
+                DDS — (add market cap)
+              </span>
+            )}
           </div>
         </div>
         {(onEdit || onDelete) && (
@@ -149,7 +180,7 @@ export default function CompanyCard({
               d="M19 9l-7 7-7-7"
             />
           </svg>
-          {showCalculation ? "Hide" : "Show"} Risk Calculation
+          {showCalculation ? "Hide" : "Show"} Calculation Details
         </button>
 
         {showCalculation && (
@@ -206,6 +237,43 @@ export default function CompanyCard({
                       "More than 6 months remaining - lower immediate risk"}
                   </span>
                 </div>
+              </div>
+
+              <div className="pt-3 border-t border-gray-200">
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                  Dilution Danger Score (DDS)
+                </div>
+                {hasDds ? (
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-700">
+                      <span
+                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                          ddsColors[company.risk_category!]
+                        }`}
+                      >
+                        {company.risk_category} • {company.dilution_danger_score}/100
+                      </span>
+                      <span className="ml-2 text-gray-600">
+                        Implied dilution:{" "}
+                        <strong className="text-gray-900">
+                          {company.implied_new_shares_pct!.toFixed(1)}%
+                        </strong>
+                      </span>
+                    </div>
+                    {company.data_warning && (
+                      <div className="text-xs text-amber-700">
+                        Data Warning: last filing is over 120 days old.
+                      </div>
+                    )}
+                    {company.reasoning && (
+                      <div className="text-xs text-gray-600">{company.reasoning}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-600">
+                    DDS requires market cap (and optional discount). Add it in Admin.
+                  </div>
+                )}
               </div>
             </div>
           </div>

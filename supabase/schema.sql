@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS companies (
   last_reporting_date DATE NOT NULL,
   cash_on_hand NUMERIC NOT NULL CHECK (cash_on_hand >= 0),
   quarterly_burn NUMERIC NOT NULL CHECK (quarterly_burn >= 0),
+  market_cap NUMERIC NULL CHECK (market_cap IS NULL OR market_cap >= 0),
+  avg_placement_discount NUMERIC NOT NULL DEFAULT 0.20 CHECK (avg_placement_discount >= 0 AND avg_placement_discount < 1),
   runway_months NUMERIC GENERATED ALWAYS AS (
     CASE 
       WHEN quarterly_burn > 0 THEN (cash_on_hand / quarterly_burn) * 3

@@ -23,6 +23,8 @@ export default function CompanyForm({
       new Date().toISOString().split("T")[0],
     cash_on_hand: company?.cash_on_hand || 0,
     quarterly_burn: company?.quarterly_burn || 0,
+    market_cap: company?.market_cap ?? undefined,
+    avg_placement_discount: company?.avg_placement_discount ?? 0.2,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,7 +62,10 @@ export default function CompanyForm({
     setFormData((prev) => ({
       ...prev,
       [name]:
-        name === "cash_on_hand" || name === "quarterly_burn"
+        name === "cash_on_hand" ||
+        name === "quarterly_burn" ||
+        name === "market_cap" ||
+        name === "avg_placement_discount"
           ? parseFloat(value) || 0
           : value,
     }));
@@ -124,7 +129,7 @@ export default function CompanyForm({
             htmlFor="last_reporting_date"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Last Reporting Date *
+            Last Filing Date *
           </label>
           <input
             type="date"
@@ -135,6 +140,9 @@ export default function CompanyForm({
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
           />
+          <div className="mt-1 text-xs text-gray-500">
+            Used for the 120-day stale data warning in DDS.
+          </div>
         </div>
 
         <div>
@@ -177,6 +185,53 @@ export default function CompanyForm({
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
             placeholder="3000000"
           />
+        </div>
+
+        <div>
+          <label
+            htmlFor="market_cap"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Market Cap (USD)
+          </label>
+          <input
+            type="number"
+            id="market_cap"
+            name="market_cap"
+            value={formData.market_cap ?? ""}
+            onChange={handleChange}
+            min="0"
+            step="any"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+            placeholder="100000000"
+          />
+          <div className="mt-1 text-xs text-gray-500">
+            Required to compute Dilution Danger Score.
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="avg_placement_discount"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Avg Placement Discount (0–1)
+          </label>
+          <input
+            type="number"
+            id="avg_placement_discount"
+            name="avg_placement_discount"
+            value={formData.avg_placement_discount ?? 0.2}
+            onChange={handleChange}
+            min="0"
+            max="0.99"
+            step="0.01"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+            placeholder="0.20"
+          />
+          <div className="mt-1 text-xs text-gray-500">
+            Example: 0.20 = 20% discount.
+          </div>
         </div>
       </div>
 

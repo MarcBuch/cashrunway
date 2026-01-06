@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { Company, CompanyInput } from "@/types";
-import { calculateRunwayMonths, determineStatus } from "@/lib/utils";
+import { calculateDilutionDangerScore, calculateRunwayMonths, determineStatus } from "@/lib/utils";
 
 // GET: Get a single company by ID
 export async function GET(
@@ -30,6 +30,20 @@ export async function GET(
       );
     }
 
+    const marketCap = (data as any).market_cap;
+    if (marketCap !== null && marketCap !== undefined && Number(marketCap) > 0) {
+      const dds = calculateDilutionDangerScore({
+        ticker: data.ticker,
+        market_cap: Number(marketCap),
+        annual_burn: ((data as any).quarterly_burn ?? 0) * 4,
+        current_cash: (data as any).cash_on_hand ?? 0,
+        avg_placement_discount: (data as any).avg_placement_discount ?? 0.2,
+        last_filing_date: (data as any).last_reporting_date,
+      });
+
+      return NextResponse.json({ ...data, ...dds });
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Unexpected error:", error);
@@ -55,9 +69,14 @@ export async function PATCH(
     if (body.company_name !== undefined) updates.company_name = body.company_name;
     if (body.last_reporting_date !== undefined)
       updates.last_reporting_date = body.last_reporting_date;
+    if ((body as any).last_filing_date !== undefined)
+      updates.last_reporting_date = (body as any).last_filing_date;
     if (body.cash_on_hand !== undefined) updates.cash_on_hand = body.cash_on_hand;
     if (body.quarterly_burn !== undefined)
       updates.quarterly_burn = body.quarterly_burn;
+    if (body.market_cap !== undefined) updates.market_cap = body.market_cap;
+    if (body.avg_placement_discount !== undefined)
+      updates.avg_placement_discount = body.avg_placement_discount;
 
     // If cash_on_hand or quarterly_burn changed, recalculate status
     if (body.cash_on_hand !== undefined || body.quarterly_burn !== undefined) {
@@ -110,6 +129,20 @@ export async function PATCH(
         { error: "Failed to update company" },
         { status: 500 }
       );
+    }
+
+    const marketCap = (data as any).market_cap;
+    if (marketCap !== null && marketCap !== undefined && Number(marketCap) > 0) {
+      const dds = calculateDilutionDangerScore({
+        ticker: data.ticker,
+        market_cap: Number(marketCap),
+        annual_burn: ((data as any).quarterly_burn ?? 0) * 4,
+        current_cash: (data as any).cash_on_hand ?? 0,
+        avg_placement_discount: (data as any).avg_placement_discount ?? 0.2,
+        last_filing_date: (data as any).last_reporting_date,
+      });
+
+      return NextResponse.json({ ...data, ...dds });
     }
 
     return NextResponse.json(data);

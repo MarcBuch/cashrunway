@@ -111,6 +111,30 @@ export default function RiskExplanation() {
             </div>
           </div>
 
+          {/* DDS Section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              Dilution Danger Score (DDS)
+            </h3>
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
+              <div className="text-sm text-gray-700">
+                DDS estimates how painful the next raise could be by modeling the implied dilution
+                needed to fund ~12 months of burn.
+              </div>
+              <div className="text-sm text-gray-700">
+                <strong>Funding Gap</strong> = max(Annual Burn − Current Cash, 0)
+                <br />
+                <strong>Required Raise</strong> = Funding Gap × 1.1
+                <br />
+                <strong>Implied Dilution</strong> = Required Raise ÷ (Market Cap × (1 − Discount))
+              </div>
+              <div className="text-xs text-gray-600">
+                <strong>Stale Data Warning:</strong> if the last filing date is over 120 days old,
+                the DDS includes a warning flag.
+              </div>
+            </div>
+          </div>
+
           {/* Example Calculation */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-3">

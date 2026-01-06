@@ -101,3 +101,166 @@ export function calculateCashRemainingPercentage(
   // When runway < 3 months (danger zone), percentage will be < 12.5% (< 20% when accounting for threshold)
   return Math.max(0, Math.min(100, (runwayMonths / maxReasonableRunway) * 100));
 }
+
+export type DilutionRiskCategory = "Safe" | "Moderate" | "High" | "Critical";
+
+export interface DilutionDangerScoreInput {
+  ticker?: string;
+  market_cap: number;
+  annual_burn: number;
+  current_cash: number;
+  avg_placement_discount?: number; // 0.20 = 20%
+  last_filing_date?: string; // YYYY-MM-DD
+}
+
+export interface DilutionDangerScoreResult {
+  ticker?: string;
+  dilution_danger_score: number; // 0-100
+  risk_category: DilutionRiskCategory;
+  implied_new_shares_pct: number; // percent (0-100+)
+  data_warning: boolean;
+  reasoning: string;
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function lerp(x: number, inMin: number, inMax: number, outMin: number, outMax: number) {
+  if (inMax === inMin) return outMin;
+  const t = (x - inMin) / (inMax - inMin);
+  return outMin + t * (outMax - outMin);
+}
+
+function computeDataWarning(lastFilingDate?: string) {
+  if (!lastFilingDate) return false;
+  const parsed = new Date(lastFilingDate);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const ageDays = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24);
+  return ageDays > 120;
+}
+
+function formatPct(pct: number) {
+  if (!isFinite(pct)) return "∞";
+  if (pct >= 1000) return `${pct.toFixed(0)}%`;
+  if (pct >= 100) return `${pct.toFixed(0)}%`;
+  if (pct >= 10) return `${pct.toFixed(1)}%`;
+  return `${pct.toFixed(2)}%`;
+}
+
+/**
+ * Dilution Danger Score (DDS)
+ * Calculates 0–100 risk score based on implied dilution required to fund next ~12 months.
+ */
+export function calculateDilutionDangerScore(
+  input: DilutionDangerScoreInput
+): DilutionDangerScoreResult {
+  const avgPlacementDiscount =
+    input.avg_placement_discount === undefined || input.avg_placement_discount === null
+      ? 0.2
+      : input.avg_placement_discount;
+
+  const ticker = input.ticker;
+  const marketCap = Number(input.market_cap);
+  const annualBurn = Number(input.annual_burn);
+  const currentCash = Number(input.current_cash);
+  const dataWarning = computeDataWarning(input.last_filing_date);
+
+  // Edge cases
+  if (!isFinite(annualBurn) || !isFinite(currentCash) || !isFinite(marketCap)) {
+    return {
+      ticker,
+      dilution_danger_score: 99,
+      risk_category: "Critical",
+      implied_new_shares_pct: Infinity,
+      data_warning: dataWarning,
+      reasoning: "Insufficient numeric inputs to compute dilution reliably.",
+    };
+  }
+
+  if (annualBurn <= 0) {
+    return {
+      ticker,
+      dilution_danger_score: 0,
+      risk_category: "Safe",
+      implied_new_shares_pct: 0,
+      data_warning: dataWarning,
+      reasoning:
+        "Cash-flow-positive (or zero burn) implies no funding gap over the next 12 months.",
+    };
+  }
+
+  const fundingGap = Math.max(annualBurn - currentCash, 0);
+  if (fundingGap <= 0) {
+    return {
+      ticker,
+      dilution_danger_score: 0,
+      risk_category: "Safe",
+      implied_new_shares_pct: 0,
+      data_warning: dataWarning,
+      reasoning:
+        "Current cash covers the next 12 months of burn; no dilution required on this model.",
+    };
+  }
+
+  const requiredRaise = fundingGap * 1.1;
+
+  const discount = clamp(Number(avgPlacementDiscount) || 0, 0, 0.95);
+  const effectiveMarketCap = marketCap * (1 - discount);
+
+  if (marketCap <= 0 || effectiveMarketCap <= 0) {
+    return {
+      ticker,
+      dilution_danger_score: 99,
+      risk_category: "Critical",
+      implied_new_shares_pct: Infinity,
+      data_warning: dataWarning,
+      reasoning:
+        "Market cap is too small (or discount too large) to compute a meaningful implied dilution; High Bankruptcy Risk.",
+    };
+  }
+
+  const impliedDilutionRatio = requiredRaise / effectiveMarketCap;
+  const impliedPct = impliedDilutionRatio * 100;
+
+  if (marketCap < requiredRaise) {
+    return {
+      ticker,
+      dilution_danger_score: 99,
+      risk_category: "Critical",
+      implied_new_shares_pct: impliedPct,
+      data_warning: dataWarning,
+      reasoning: `Required raise (${formatPct((requiredRaise / marketCap) * 100)} of market cap) exceeds market cap; High Bankruptcy Risk.`,
+    };
+  }
+
+  // Piecewise-linear score mapping using breakpoints in implied percent dilution.
+  let score: number;
+  if (impliedPct <= 0) {
+    score = 0;
+  } else if (impliedPct <= 5) {
+    score = lerp(impliedPct, 0, 5, 0, 20);
+  } else if (impliedPct <= 15) {
+    score = lerp(impliedPct, 5, 15, 20, 50);
+  } else if (impliedPct <= 30) {
+    score = lerp(impliedPct, 15, 30, 50, 80);
+  } else {
+    // 30%–60% => 80–100, clamp above that
+    score = lerp(clamp(impliedPct, 30, 60), 30, 60, 80, 100);
+  }
+
+  const rounded = clamp(Math.round(score), 0, 100);
+  const riskCategory: DilutionRiskCategory =
+    impliedPct <= 5 ? "Safe" : impliedPct <= 15 ? "Moderate" : impliedPct <= 30 ? "High" : "Critical";
+
+  const reasoning = `Funding gap of ${formatPct((fundingGap / marketCap) * 100)} of market cap implies ~${formatPct(impliedPct)} new shares (after ${formatPct(discount * 100)} placement discount).`;
+
+  return {
+    ticker,
+    dilution_danger_score: rounded,
+    risk_category: riskCategory,
+    implied_new_shares_pct: impliedPct,
+    data_warning: dataWarning,
+    reasoning,
+  };
+}
